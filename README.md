@@ -83,3 +83,7 @@ SDK и загрузка пакетов не требуются: использу
 ## Editor v0.15
 
 Mosaic pixelates a selected area using 12-pixel blocks. Crop opens side and corner handles. Drag a border inward to adjust the frame. Switching tools or saving applies the crop, Esc cancels it, and Ctrl+Z restores the previous image. Enter, Ctrl+C and Ctrl+S all save the PNG and copy the image.
+
+## Cursor capture v0.16
+
+Screenshots include the visible mouse pointer at capture time. Region selection keeps the cursor from the captured screen. Pointer shapes, hotspots and clipping at image boundaries are preserved.

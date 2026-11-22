@@ -102,7 +102,10 @@ namespace LkScreenshot {
   public static BitmapSource Grab() {
    var r=Forms.Screen.PrimaryScreen.Bounds;
    using(var b=new Drawing.Bitmap(r.Width,r.Height,Drawing.Imaging.PixelFormat.Format32bppRgb)) {
-    using(var g=Drawing.Graphics.FromImage(b)) g.CopyFromScreen(r.Left,r.Top,0,0,r.Size,Drawing.CopyPixelOperation.SourceCopy);
+    using(var g=Drawing.Graphics.FromImage(b)) {
+     g.CopyFromScreen(r.Left,r.Top,0,0,r.Size,Drawing.CopyPixelOperation.SourceCopy);
+     CursorCapture.DrawCurrent(g,r);
+    }
     return FromCapture(b);
    }
   }
@@ -441,6 +444,28 @@ namespace LkScreenshot {
    var preview=new RenderTargetBitmap((int)(width*scale),(int)(height*scale),96*scale,96*scale,PixelFormats.Pbgra32);preview.Render(content);App.WritePng(preview,path);
   }
   public static BitmapSource Sample() {var pixels=new byte[640*360*4];for(int y=0;y<360;y++)for(int x=0;x<640;x++){int i=(y*640+x)*4;pixels[i]=(byte)(35+x/5);pixels[i+1]=(byte)(35+y/3);pixels[i+2]=(byte)(40+(x%32)*4);pixels[i+3]=255;}return BitmapSource.Create(640,360,96,96,PixelFormats.Bgra32,null,pixels,640*4);}
+  static void VerifyCursor(string folder) {
+   foreach(var cursor in new[]{Forms.Cursors.Arrow,Forms.Cursors.Cross,Forms.Cursors.IBeam,Forms.Cursors.Hand}) {
+    using(var large=new Drawing.Bitmap(192,192,Drawing.Imaging.PixelFormat.Format32bppRgb))
+    using(var clipped=new Drawing.Bitmap(64,64,Drawing.Imaging.PixelFormat.Format32bppRgb)) {
+     using(var g=Drawing.Graphics.FromImage(large)){g.Clear(Drawing.Color.CornflowerBlue);CursorCapture.Draw(g,cursor.Handle,new Drawing.Point(96,96));}
+     using(var g=Drawing.Graphics.FromImage(clipped)){g.Clear(Drawing.Color.CornflowerBlue);CursorCapture.Draw(g,cursor.Handle,new Drawing.Point(2,2));}
+     var image=App.FromCapture(large);var original=Pixels(image);
+     int left=192,top=192,right=0,bottom=0;
+     for(int y=0;y<192;y++)for(int x=0;x<192;x++) {
+      int i=(y*192+x)*4;
+      if(original[i]==237&&original[i+1]==149&&original[i+2]==100)continue;
+      left=Math.Min(left,x);top=Math.Min(top,y);right=Math.Max(right,x);bottom=Math.Max(bottom,y);
+     }
+     if(left>right)throw new Exception("Cursor missing: "+cursor);
+     if(cursor==Forms.Cursors.Cross && (Math.Abs((left+right)/2.0-96)>2 || Math.Abs((top+bottom)/2.0-96)>2))
+      throw new Exception("Cursor hotspot alignment");
+     CompareRegion(original,192,new Int32Rect(94,94,64,64),Pixels(App.FromCapture(clipped)));
+     string path=System.IO.Path.Combine(folder,"cursor-"+cursor.ToString().Replace("[Cursor: ","").Replace("]","")+".png");
+     App.WritePng(image,path);Equal(original,ReadPng(path),"Cursor PNG");
+    }
+   }
+  }
   static void VerifyCaptureAndSave(string folder) {
    BitmapSource capture;
    using(var native=new Drawing.Bitmap(3,2,Drawing.Imaging.PixelFormat.Format32bppRgb)) {
@@ -462,6 +487,7 @@ namespace LkScreenshot {
   public static void Run(string folder) {
    Directory.CreateDirectory(folder);var pixels=new byte[320*200*4];for(int y=0;y<200;y++)for(int x=0;x<320;x++){int i=(y*320+x)*4;pixels[i]=(byte)(x%256);pixels[i+1]=(byte)y;pixels[i+2]=(byte)((x%2)*255);pixels[i+3]=255;}
    VerifyCaptureAndSave(folder);
+   VerifyCursor(folder);
    var image=BitmapSource.Create(320,200,144,144,PixelFormats.Bgra32,null,pixels,320*4);var crop=SelectionWindow.Crop(image,new Rect(20,30,100,80),320,200);if(crop.PixelWidth!=100||crop.PixelHeight!=80)throw new Exception("Crop size");
    var mosaicDoc=new ImageDocument(image);var mosaicArea=new Int32Rect(30,30,25,25);
    mosaicDoc.Mosaic(mosaicArea);var mosaic=Pixels(mosaicDoc.Bitmap);
@@ -482,7 +508,7 @@ namespace LkScreenshot {
    var portraitImage=new TransformedBitmap(largeImage,new RotateTransform(90));var portraitEditor=new EditorWindow(portraitImage,delegate {return true;});RenderWindow(portraitEditor,820,400,System.IO.Path.Combine(folder,"editor-portrait.png"),1);portraitEditor.VerifyFit();portraitEditor.Close();
    var settings=new SettingsWindow(new Preferences {Folder=@"C:\Users\USERNAME\Documents\Screenshots"},false,delegate{});RenderWindow(settings,466,0,System.IO.Path.Combine(folder,"settings-preview.png"),1);RenderWindow(settings,466,0,System.IO.Path.Combine(folder,"settings-150.png"),1.5);settings.Close();
    var text=new TextEntryWindow();text.Input.Text="Sample caption";RenderWindow(text,420,160,System.IO.Path.Combine(folder,"text-preview.png"),1);text.Close();
-   File.WriteAllText(System.IO.Path.Combine(folder,"result.txt"),"PASS: mosaic block uniformity, boundaries and undo; crop side/corner handles, apply and cancel; capture RGB, orientation and opacity; unedited PNG; interrupted write and filename collision preserve previous file; crop; blur boundaries; PNG roundtrip; SVG tool rendering; current color changes and highlights exactly one swatch; editor layout; arrow, rectangle, pencil, blur, crop gestures; text commit; undo each tool; cancel each gesture; 20 consecutive pencil strokes; 12-action pixel-exact undo; untouched pixels and prior strokes byte-identical after every edit; PNG pixels after 20 strokes; cropped boundary and edge dot; full image fits before/after resizing; landscape 3840x2160 and portrait 2160x3840; 150% render and 144 DPI source; 4K edge stroke position, color and undo; scaled drawing coordinates.");
+   File.WriteAllText(System.IO.Path.Combine(folder,"result.txt"),"PASS: cursor arrow, cross, I-beam and hand rendering, hotspot alignment, edge clipping and PNG roundtrip; mosaic block uniformity, boundaries and undo; crop side/corner handles, apply and cancel; capture RGB, orientation and opacity; unedited PNG; interrupted write and filename collision preserve previous file; crop; blur boundaries; PNG roundtrip; SVG tool rendering; current color changes and highlights exactly one swatch; editor layout; arrow, rectangle, pencil, blur, crop gestures; text commit; undo each tool; cancel each gesture; 20 consecutive pencil strokes; 12-action pixel-exact undo; untouched pixels and prior strokes byte-identical after every edit; PNG pixels after 20 strokes; cropped boundary and edge dot; full image fits before/after resizing; landscape 3840x2160 and portrait 2160x3840; 150% render and 144 DPI source; 4K edge stroke position, color and undo; scaled drawing coordinates.");
   }
  }
 }
