@@ -16,7 +16,6 @@
   <Style TargetType="Window">
     <Setter Property="Background" Value="{StaticResource background}"/>
     <Setter Property="Foreground" Value="{StaticResource text}"/>
-    <Setter Property="FontFamily" Value="Segoe UI"/>
     <Setter Property="FontSize" Value="14.667"/>
     <Setter Property="UseLayoutRounding" Value="True"/>
   </Style>

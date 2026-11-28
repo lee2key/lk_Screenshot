@@ -23,7 +23,7 @@ namespace LkScreenshot {
    return new Int32Rect(left, top, (int)Math.Ceiling(area.Right) - left, (int)Math.Ceiling(area.Bottom) - top);
   }
 
-  void Remember(Action restore) {
+  internal void Remember(Action restore) {
    history.AddLast(restore);
    if (history.Count > 12) history.RemoveFirst();
   }
@@ -47,11 +47,11 @@ namespace LkScreenshot {
    Remember(delegate { Bitmap.WritePixels(area, before, stride, 0); });
   }
 
-  public void Crop(Int32Rect area) {
+  public void Crop(Int32Rect area,Action restoreOverlay=null) {
    if (area.IsEmpty || (area.Width == Bitmap.PixelWidth && area.Height == Bitmap.PixelHeight)) return;
    var previous = Bitmap;
    Bitmap = new WriteableBitmap(new CroppedBitmap(previous, area));
-   Remember(delegate { Bitmap = previous; });
+   Remember(delegate { Bitmap = previous;if(restoreOverlay!=null)restoreOverlay(); });
   }
 
   public void Draw(UIElement mark) {
